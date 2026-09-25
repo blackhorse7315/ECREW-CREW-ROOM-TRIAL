@@ -242,11 +242,20 @@
       <div><label class="text-slate-300 text-sm font-semibold block mb-1">Urutan Tampil (Angka)</label> <input id="f-order" type="number" class="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:bg-slate-800/70 transition" placeholder="Contoh: 1, 2, 3...">
       </div>
       
-      <!-- Hak Akses Multi-pilihan (Checkbox) -->
+      <!-- Visibilitas Menu -->
       <div>
-        <label class="text-slate-300 text-sm font-semibold block mb-1 flex items-center justify-between">
-            <span>Access Allowed For (Position)</span>
-            <button type="button" id="btn-check-all" class="text-[10px] text-cyan-400 hover:text-cyan-300 px-2 py-0.5 border border-cyan-500/30 rounded">Check All</button>
+          <label class="text-slate-300 text-sm font-semibold block mb-1">Visibilitas Menu</label>
+          <select id="f-visibility" class="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500 focus:bg-slate-800/70 transition">
+              <option value="public">Tampil Semua (Unhide)</option>
+              <option value="restricted">Sembunyikan & Khususkan (Hide)</option>
+          </select>
+      </div>
+
+      <!-- Hak Akses Multi-pilihan (Checkbox) -->
+      <div id="access-section" class="hidden">
+        <label class="text-slate-300 text-sm font-semibold block mb-1 flex items-center justify-between mt-4">
+            <span>Pilih Posisi (Bisa Akses)</span>
+            <button type="button" id="btn-check-all" class="text-[10px] text-cyan-400 hover:text-cyan-300 px-2 py-0.5 border border-cyan-500/30 rounded transition">Pilih / Hapus Semua</button>
         </label> 
         <div class="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 max-h-40 overflow-y-auto custom-scrollbar flex flex-col gap-2" id="access-checkbox-container">
             <!-- Checkbox akan digenerate oleh JS -->
@@ -492,69 +501,38 @@
       
       const cbContainer = document.getElementById('access-checkbox-container');
       if(cbContainer) {
-          let cbHTML = `
-            <label class="flex items-center gap-2 cursor-pointer group">
-                <input type="checkbox" value="All" id="cb-all-pos" class="access-cb w-4 h-4 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500/50 bg-slate-700" checked>
-                <span class="text-white text-sm group-hover:text-cyan-300 transition font-semibold">Semua Posisi (All)</span>
-            </label>
-            <div class="h-px w-full bg-slate-700 my-1"></div>
-          `;
-          cbHTML += POSITIONS_LIST.map(p => `
+          let cbHTML = POSITIONS_LIST.map(p => `
             <label class="flex items-center gap-2 cursor-pointer group pl-2">
-                <input type="checkbox" value="${p}" class="access-cb access-cb-item w-4 h-4 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500/50 bg-slate-700" disabled>
+                <input type="checkbox" value="${p}" class="access-cb access-cb-item w-4 h-4 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500/50 bg-slate-700">
                 <span class="text-slate-300 text-sm group-hover:text-white transition">${p}</span>
             </label>
           `).join('');
           cbContainer.innerHTML = cbHTML;
-          
-          const allCb = document.getElementById('cb-all-pos');
-          const itemCbs = document.querySelectorAll('.access-cb-item');
-          
-          allCb.onchange = (e) => {
-              itemCbs.forEach(cb => {
-                  if(e.target.checked) {
-                      cb.checked = false;
-                      cb.disabled = true;
-                  } else {
-                      cb.disabled = false;
-                  }
-              });
-          };
 
           document.getElementById('btn-check-all').onclick = () => {
-              allCb.checked = false;
+              const itemCbs = document.querySelectorAll('.access-cb-item');
+              const allChecked = Array.from(itemCbs).every(cb => cb.checked);
               itemCbs.forEach(cb => {
-                  cb.disabled = false;
-                  cb.checked = true;
+                  cb.checked = !allChecked;
               });
           };
       }
   }
 
   function getSelectedAccessPositions() {
-      const allCb = document.getElementById('cb-all-pos');
-      if(allCb && allCb.checked) return 'All'; 
       const itemCbs = document.querySelectorAll('.access-cb-item:checked');
       const selected = Array.from(itemCbs).map(cb => cb.value);
-      return selected.length > 0 ? JSON.stringify(selected) : 'All'; 
+      return JSON.stringify(selected); 
   }
 
   function setAccessPositions(accessVal) {
-      const allCb = document.getElementById('cb-all-pos');
       const itemCbs = document.querySelectorAll('.access-cb-item');
-      
-      if(!accessVal || accessVal === 'All' || accessVal === '[]') {
-          allCb.checked = true;
-          itemCbs.forEach(cb => { cb.checked = false; cb.disabled = true; });
-          return;
+      let parsedArr = [];
+      if(accessVal && accessVal !== 'All') {
+          try { parsedArr = JSON.parse(accessVal); } catch(e) { parsedArr = [accessVal]; }
       }
 
-      allCb.checked = false;
-      let parsedArr = [];
-      try { parsedArr = JSON.parse(accessVal); } catch(e) { parsedArr = [accessVal]; }
-
       itemCbs.forEach(cb => {
-          cb.disabled = false;
           cb.checked = parsedArr.includes(cb.value);
       });
   }
@@ -1179,7 +1157,7 @@
     btn.textContent = 'Update';
   };
 
-  function checkAccess(menu) {
+  function checkAccess(menu, silent = false) {
       if (isAdmin) return true;
 
       if (!menu.access_positions || menu.access_positions === 'All' || menu.access_positions.length === 0) {
@@ -1194,7 +1172,7 @@
       }
 
       if (currentUser && !allowedPositions.includes(currentUser.position)) {
-           showRestrictedModal(`Menu ini hanya diperbolehkan untuk posisi tertentu. Akses untuk posisi Anda (${currentUser.position || 'Unknown'}) ditolak.`);
+           if(!silent) showRestrictedModal(`Menu ini hanya diperbolehkan untuk posisi tertentu. Akses untuk posisi Anda (${currentUser.position || 'Unknown'}) ditolak.`);
            return false;
       }
 
@@ -1223,7 +1201,11 @@
   function renderMenus() {
     const grid = document.getElementById('menu-grid');
     const empty = document.getElementById('empty-state');
-    const mainMenus = allMenus.filter(m => !m.parent_id).sort((a, b) => (a.order || 0) - (b.order || 0));
+    // Menampilkan menu utama, disortir, lalu di-filter HANYA untuk posisi yang memiliki akses
+    const mainMenus = allMenus
+        .filter(m => !m.parent_id)
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .filter(m => checkAccess(m, true));
 
     if (mainMenus.length === 0) {
       grid.innerHTML = '';
@@ -1264,10 +1246,16 @@
           imgHtml = `<i data-lucide="folder" class="w-12 h-12 text-slate-400 group-hover:text-cyan-400 group-hover:scale-110 transition-all duration-300"></i>`;
       }
       
+      // Indikator khusus Admin jika menu disembunyikan/dikhususkan
+      const restrictedIcon = (isAdmin && menu.access_positions !== 'All' && menu.access_positions !== undefined) 
+        ? `<div class="absolute top-2 left-2 bg-slate-900/90 border border-slate-700 rounded-md p-1.5 z-10 shadow-lg shadow-black/50" title="Menu Tersembunyi (Khusus)"><i data-lucide="eye-off" class="w-3.5 h-3.5 text-red-400"></i></div>` 
+        : '';
+      
       let cardHtml = `
           <div class="flex-1 bg-slate-700/50 flex items-center justify-center overflow-hidden relative">
+            ${restrictedIcon}
             ${imgHtml}
-            ${isAdmin ? `<button class="edit-btn absolute top-1.5 right-1.5 bg-slate-900/80 hover:bg-cyan-600/80 rounded-md p-1.5 opacity-0 group-hover:opacity-100 transition-all z-10"><i data-lucide="edit" class="w-3.5 h-3.5 text-slate-200"></i></button>` : ''}
+            ${isAdmin ? `<button class="edit-btn absolute top-2 right-2 bg-slate-900/90 hover:bg-cyan-600/90 rounded-md p-1.5 opacity-0 group-hover:opacity-100 transition-all z-10 shadow-lg"><i data-lucide="edit" class="w-3.5 h-3.5 text-slate-200"></i></button>` : ''}
           </div>
           <div class="p-1.5 sm:p-2 text-center h-10 sm:h-11 flex items-center justify-center">
             <p class="text-slate-200 group-hover:text-cyan-300 font-medium text-[10px] sm:text-xs line-clamp-2 leading-[1.2] transition-colors">${menu.name}</p>
@@ -1302,7 +1290,11 @@
     document.getElementById('submenu-title').textContent = parent.name;
     const grid = document.getElementById('submenu-grid');
     
-    const subs = allMenus.filter(s => s.parent_id === parent.id).sort((a, b) => (a.order || 0) - (b.order || 0));
+    // Filter submenu sesuai hak akses (agar yang tidak berhak tidak bisa melihatnya)
+    const subs = allMenus
+        .filter(s => s.parent_id === parent.id)
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .filter(s => checkAccess(s, true));
     
     grid.innerHTML = subs.map(s => {
       const hasImg = s.image_url && s.image_url.length > 0;
@@ -1320,10 +1312,16 @@
           renderImg = `<i data-lucide="file" class="w-12 h-12 text-slate-400 group-hover:text-cyan-400 group-hover:scale-110 transition-all duration-300"></i>`;
       }
       
+      // Indikator khusus Admin jika menu disembunyikan/dikhususkan
+      const restrictedIcon = (isAdmin && s.access_positions !== 'All' && s.access_positions !== undefined) 
+        ? `<div class="absolute top-2 left-2 bg-slate-900/90 border border-slate-700 rounded-md p-1.5 z-10 shadow-lg shadow-black/50" title="Menu Tersembunyi (Khusus)"><i data-lucide="eye-off" class="w-3.5 h-3.5 text-red-400"></i></div>` 
+        : '';
+      
       return `<div class="menu-card bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 cursor-pointer group relative aspect-square flex flex-col" data-bid="${s.__backendId}">
         <div class="flex-1 bg-slate-700/50 flex items-center justify-center overflow-hidden relative">
+          ${restrictedIcon}
           ${renderImg}
-          ${isAdmin ? `<button class="edit-sub absolute top-1.5 right-1.5 bg-slate-900/80 hover:bg-cyan-600/80 rounded-md p-1.5 opacity-0 group-hover:opacity-100 transition-all z-10"><i data-lucide="edit" class="w-3.5 h-3.5 text-slate-200"></i></button>` : ''}
+          ${isAdmin ? `<button class="edit-sub absolute top-2 right-2 bg-slate-900/90 hover:bg-cyan-600/90 rounded-md p-1.5 opacity-0 group-hover:opacity-100 transition-all z-10 shadow-lg"><i data-lucide="edit" class="w-3.5 h-3.5 text-slate-200"></i></button>` : ''}
         </div>
         <div class="p-1.5 sm:p-2 text-center h-10 sm:h-11 flex items-center justify-center">
           <p class="text-slate-200 group-hover:text-cyan-300 font-medium text-[10px] sm:text-xs line-clamp-2 leading-[1.2] transition-colors">${s.name}</p>
@@ -1360,6 +1358,12 @@
   document.getElementById('submenu-back-btn').onclick = () => history.back();
   document.getElementById('submenu-dash-btn').onclick = () => { showDashboard(); };
 
+  // Listener untuk toggle dropdown visibilitas
+  document.getElementById('f-visibility').onchange = (e) => {
+      const isRestricted = e.target.value === 'restricted';
+      document.getElementById('access-section').classList.toggle('hidden', !isRestricted);
+  };
+
   function openModal(edit = null) {
     history.pushState({ view: 'modal_menu' }, '');
     editingItem = edit;
@@ -1370,7 +1374,15 @@
     document.getElementById('f-image').value = edit?.image_url || '';
     document.getElementById('f-order').value = edit && edit.order !== undefined ? edit.order : allMenus.length + 1;
     
-    setAccessPositions(edit?.access_positions);
+    const accessPos = edit?.access_positions;
+    if (!accessPos || accessPos === 'All' || accessPos === '[]') {
+        document.getElementById('f-visibility').value = 'public';
+        document.getElementById('access-section').classList.add('hidden');
+    } else {
+        document.getElementById('f-visibility').value = 'restricted';
+        document.getElementById('access-section').classList.remove('hidden');
+    }
+    setAccessPositions(accessPos);
 
     document.getElementById('btn-delete').classList.toggle('hidden', !edit);
     document.getElementById('btn-duplicate').classList.toggle('hidden', !edit);
@@ -1434,8 +1446,14 @@
       const url = document.getElementById('f-url').value.trim();
       const imgUrl = document.getElementById('f-image').value.trim();
       const parentId = document.getElementById('f-parent').value;
-      const accessPos = getSelectedAccessPositions();
       const orderVal = parseInt(document.getElementById('f-order').value) || 0;
+      
+      let accessPos = 'All';
+      const isHidden = document.getElementById('f-visibility').value === 'restricted';
+      
+      if (isHidden) {
+          accessPos = getSelectedAccessPositions();
+      }
 
       const finalImageUrl = convertGoogleDriveUrl(imgUrl);
 
@@ -1447,7 +1465,8 @@
         is_submenu: !!parentId, 
         parent_id: parentId || '', 
         access_positions: accessPos, 
-        order: orderVal
+        order: orderVal,
+        is_hidden: isHidden
       };
 
       let result;
@@ -1488,7 +1507,8 @@
       is_submenu: editingItem.is_submenu,
       parent_id: editingItem.parent_id,
       access_positions: editingItem.access_positions,
-      order: allMenus.length + 1
+      order: allMenus.length + 1,
+      is_hidden: editingItem.is_hidden || false
     };
 
     const result = await window.dataSdk.create(newRecord);
