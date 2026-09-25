@@ -239,6 +239,8 @@
       </div>
       <div><label class="text-slate-300 text-sm font-semibold block mb-1">Parent Menu (optional)</label> <select id="f-parent" class="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500 focus:bg-slate-800/70 transition"> <option value="">— None (Main Menu) —</option> </select>
       </div>
+      <div><label class="text-slate-300 text-sm font-semibold block mb-1">Urutan Tampil (Angka)</label> <input id="f-order" type="number" class="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:bg-slate-800/70 transition" placeholder="Contoh: 1, 2, 3...">
+      </div>
       
       <!-- Hak Akses Multi-pilihan (Checkbox) -->
       <div>
@@ -1221,7 +1223,7 @@
   function renderMenus() {
     const grid = document.getElementById('menu-grid');
     const empty = document.getElementById('empty-state');
-    const mainMenus = allMenus.filter(m => !m.parent_id);
+    const mainMenus = allMenus.filter(m => !m.parent_id).sort((a, b) => (a.order || 0) - (b.order || 0));
 
     if (mainMenus.length === 0) {
       grid.innerHTML = '';
@@ -1300,7 +1302,7 @@
     document.getElementById('submenu-title').textContent = parent.name;
     const grid = document.getElementById('submenu-grid');
     
-    const subs = allMenus.filter(s => s.parent_id === parent.id);
+    const subs = allMenus.filter(s => s.parent_id === parent.id).sort((a, b) => (a.order || 0) - (b.order || 0));
     
     grid.innerHTML = subs.map(s => {
       const hasImg = s.image_url && s.image_url.length > 0;
@@ -1366,6 +1368,7 @@
     document.getElementById('f-name').value = edit?.name || '';
     document.getElementById('f-url').value = edit?.url || '';
     document.getElementById('f-image').value = edit?.image_url || '';
+    document.getElementById('f-order').value = edit && edit.order !== undefined ? edit.order : allMenus.length + 1;
     
     setAccessPositions(edit?.access_positions);
 
@@ -1432,6 +1435,7 @@
       const imgUrl = document.getElementById('f-image').value.trim();
       const parentId = document.getElementById('f-parent').value;
       const accessPos = getSelectedAccessPositions();
+      const orderVal = parseInt(document.getElementById('f-order').value) || 0;
 
       const finalImageUrl = convertGoogleDriveUrl(imgUrl);
 
@@ -1443,7 +1447,7 @@
         is_submenu: !!parentId, 
         parent_id: parentId || '', 
         access_positions: accessPos, 
-        order: editingItem?.order || allMenus.length
+        order: orderVal
       };
 
       let result;
@@ -1484,7 +1488,7 @@
       is_submenu: editingItem.is_submenu,
       parent_id: editingItem.parent_id,
       access_positions: editingItem.access_positions,
-      order: allMenus.length
+      order: allMenus.length + 1
     };
 
     const result = await window.dataSdk.create(newRecord);
